@@ -7,17 +7,19 @@ import time
 import datetime
 import subprocess
 import keras 
-from keras.models import Model
+from keras.models import Model, Sequential
 from keras.utils import np_utils
 from keras.callbacks import ReduceLROnPlateau, ModelCheckpoint, TensorBoard, EarlyStopping
-from keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dropout
+from keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dropout, Dense, Activation, BatchNormalization
 
 ######################### Get Data Directory ########################
 data_path = sys.argv[1]
+bthsize = int(sys.argv[2])
+# Beef --> 3
+
+
 doc_name = data_path.split('/')[-2]
-
 epoch = 1000
-
 data_list = os.listdir(data_path)  # list all file in this file
 
 ########################## Get train datasets ########################
@@ -31,6 +33,8 @@ train_set_cols = get_dim.shape[1]
 train_label = np.loadtxt(''.join((data_path, 'train_label')), delimiter = '\n')
 train_set = np.ndarray((total_train, train_set_rows, train_set_cols))
 
+for i in range(1, len(train_list)):
+	train_set[i] = pd.read_table(''.join((data_path, 'train_ser_', str(i))), sep = ' ', header = None)
 
 ######################## Get test datasets #######################
 
@@ -43,124 +47,81 @@ test_set_cols = get_dim.shape[1]
 test_label = np.loadtxt(''.join((data_path, 'test_label')), delimiter = '\n')
 test_set = np.ndarray((total_test, test_set_rows, test_set_cols))
 
+for i in range(1, len(test_list)):
+	test_set[i] = pd.read_table(''.join((data_path, 'test_ser_', str(i))), sep = ' ', header = None)
 
 ########################## Build Model ########################
 
 keras.backend.set_image_data_format('channels_last')  # TF dimension ordering in this code
 
 nb_classes = len(np.unique(np.concatenate([train_label,test_label])))
-batch_size = 32
+batch_size = bthsize
 nb_epochs = epoch
 
-train_set = train_set[..., np.newaxis]
-test_set = test_set[..., np.newaxis]
-
 #### Normalization datasets ####
-train_set = train_set[..., np.newaxis]
-test_set = test_set[..., np.newaxis]
-mean = np.mean(train_set)  # mean for data centering
-std = np.std(train_set)  # std for data normalization
-train_set = (train_set - mean)/std
-test_set = (test_set - mean)/std
 
-#### Add Dummy to label ####
-# tn_label = train_label
-# tt_label = test_label
-# train_label = (train_label - train_label.min())/(train_label.max() - train_label.min())*(nb_classes - 1)
-# y_train = np_utils.to_categorical(train_label, nb_classes)
-# test_label = (test_label - test_label.min())/(test_label.max() - test_label.min())*(nb_classes - 1)
-# y_test = np_utils.to_categorical(test_label, nb_classes)
+train_set = train_set[..., np.newaxis]   # reshape
+test_set = test_set[..., np.newaxis]     # reshape
+# mean = np.mean(train_set)  # mean for data centering
+# std = np.std(train_set)  # std for data normalization
+# train_set = (train_set - mean)/std
+# test_set = (test_set - mean)/std
+
+#### Add Dummy to label (Scale) ####
+
+train_label = train_label[..., np.newaxis]   # reshape
+test_label = test_label[..., np.newaxis]     # reshape
+
+train_label = (train_label - train_label.min())/(train_label.max() - train_label.min())*(nb_classes - 1)
+y_train = keras.utils.to_categorical(train_label, nb_classes)
+
+test_label = (test_label - test_label.min())/(test_label.max() - test_label.min())*(nb_classes - 1)
+y_test = keras.utils.to_categorical(test_label, nb_classes)
+
 
 #### Start Model ####
-x_train = train_set.reshape(train_set.shape[0], train_set.shape[1]*train_set.shape[2], 1, 1)
-x_test = test_set.reshape(test_set.shape[0], test_set.shape[1]*test_set.shape[2], 1, 1)
 
+x_train = train_set
+x_test = test_set
 
+model = Sequential()
+model.add(Conv2D(32, (3, 3), padding='same',input_shape=x_train.shape[1:]))
+# model.add(Activation('relu'))
+# model.add(BatchNormalization())
+# model.add(Conv2D(32, (3, 3)))
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Dropout(0.25))
 
+model.add(Conv2D(64, (3, 3), padding='same'))
+# model.add(Activation('relu'))
+# model.add(BatchNormalization())
+# model.add(Conv2D(64, (3, 3)))
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Dropout(0.25))
 
-inputs = keras.layers.Input(x_train.shape[1:])
+#########
+model.add(Conv2D(32, (3, 3), padding='same'))
+model.add(Activation('relu'))
+model.add(MaxPooling2D(pool_size=(2, 2)))
+model.add(Dropout(0.25))
+##########
 
-conv0 = keras.layers.Conv2D(128, 48, padding='same')(inputs)
-conv0 = keras.layers.normalization.BatchNormalization()(conv0)
-conv0 = keras.layers.Activation('relu')(conv0)
+model.add(Flatten())
+model.add(Dense(512))
+model.add(Activation('relu'))
+model.add(Dropout(0.5))
+model.add(Dense(nb_classes))
+model.add(Activation('softmax'))
 
-conv0 = keras.layers.Conv2D(256, 8, padding='same')(conv0)
-conv0 = keras.layers.normalization.BatchNormalization()(conv0)
-conv0 = keras.layers.Activation('relu')(conv0)
-
-conv0 = keras.layers.Conv2D(128, 4, padding='same')(conv0)
-conv0 = keras.layers.normalization.BatchNormalization()(conv0)
-conv0 = keras.layers.Activation('relu')(conv0)
-
-full = keras.layers.pooling.GlobalAveragePooling2D()(conv0)    
-out = keras.layers.Dense(nb_classes, activation='softmax')(full)
-
-#conv1 = keras.layers.Conv2D(layer1_size, layer1_kernel)(conv0)
-#conv1 = keras.layers.Activation('relu')(conv1)
-#conv1 = keras.layers.Conv2D(layer1_size, layer1_kernel)(conv1)
-#conv1 = keras.layers.Activation('relu')(conv1)
-#conv1 = keras.layers.Conv2D(layer1_size, layer1_kernel)(conv1)
-#conv1 = keras.layers.Activation('relu')(conv1)
-#conv1 = MaxPooling2D(pool_size=(2, 2))(conv1)
-# 
-#conv2 = keras.layers.Conv2D(layer2_size, layer2_kernel)(conv1)
-#conv2 = keras.layers.Activation('relu')(conv2)
-#conv2 = Flatten()(conv2)
-#
-#conv3 = keras.layers.Dense(layer3_size, activation='relu')(conv2)
-#conv3 = Dropout(0.5)(conv3)
-#
-#conv4 = keras.layers.Dense(layer4_size, activation='relu')(conv3)
-#conv4 = Dropout(0.5)(conv4)
-#conv4 = keras.layers.Dense(layer4_size, activation='relu')(conv4)
-#conv4 = Dropout(0.5)(conv4)
-#
-#conv5 = keras.layers.Dense(layer5_size, activation='relu')(conv4)
-
-#out = keras.layers.Dense(nb_classes, activation='softmax')(conv5)
-
-#conv3 = keras.layers.Conv2D(layer3_size, layer3_kernel)(conv2)
-##conv3 = keras.layers.normalization.BatchNormalization()(conv3)
-#conv3 = MaxPooling2D(pool_size=(2, 2))(conv3)
-#conv3 = keras.layers.Activation('relu')(conv3)
-#conv3 = Dropout(0.5)(conv3)
-
-# conv4 = keras.layers.Conv2D(layer4_size, layer4_kernel)(conv3)
-# #conv4 = keras.layers.normalization.BatchNormalization()(conv4)
-# #conv4 = MaxPooling2D(pool_size=(2, 2))(conv4)
-# conv4 = keras.layers.Activation('relu')(conv4)
-# #conv4 = Dropout(0.5)(conv4)
-# 
-# conv5 = keras.layers.Conv2D(layer5_size, layer5_kernel, padding='same')(conv4)
-# #conv5 = keras.layers.normalization.BatchNormalization()(conv5)
-# #conv5 = MaxPooling2D(pool_size=(2, 2))(conv5)
-# conv5 = keras.layers.Activation('relu')(conv5)
-# #conv5 = Dropout(0.5)(conv5)
-
-# conv6 = keras.layers.Conv2D(64, layer1_kernel, padding='same')(conv5)
-# #conv1 = keras.layers.normalization.BatchNormalization()(conv1)
-# conv6 = MaxPooling2D(pool_size=(2, 2))(conv6)
-# conv6 = keras.layers.Activation('relu')(conv6)
-
-# #full = keras.layers.pooling.GlobalMaxPooling2D()(conv5)  
-# full = Flatten()(conv3)
-# #full = Dropout(0.5)(full)
-# out = keras.layers.Dense(nb_classes, activation='softmax')(full)
-
-model = Model(input=inputs, output=out)
+#######################################################################
  
-optimizer = keras.optimizers.Adam()
-model.compile(loss='categorical_crossentropy',
-              optimizer=optimizer,
-              metrics=['accuracy'])
- 
-###################### define callback functions ####################
-reduce_lr = ReduceLROnPlateau(monitor = 'val_loss', factor=0.5, patience=50, min_lr=0.00001) 
-check_p = ModelCheckpoint('tmp', monitor='val_loss', verbose=0, save_best_only=True, save_weights_only=False, mode='auto', period=100)
-tboard = TensorBoard(log_dir='./logs', histogram_freq=100, batch_size=32, write_graph=True, write_grads=True, write_images=True, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None)
-#earlystop = EarlyStopping(monitor='val_loss', min_delta=0.00001, patience=1000, verbose=0, mode='auto')
+opt = keras.optimizers.Adam()
 
-fit = model.fit(x_train, y_train, batch_size=batch_size, epochs=nb_epochs, callbacks=[tboard], validation_data=(x_test,y_test))
+model.compile(loss='categorical_crossentropy', optimizer=opt, metrics=['accuracy'])
+
+model.fit(x_train, y_train, batch_size=batch_size, epochs=nb_epochs, validation_data=(x_test, y_test), shuffle=True)
 
 ##### save model #######
 # model_name = 'Model_' + str(doc_name) + '_' + str(layer1_size) + '_' + str(layer2_size) + '_' + str(layer3_size) +'_' + str(layer4_size) + '_' + str(layer5_size) +'_'+str(layer1_kernel) + '_' + str(nb_epochs) + '_' + str(time.mktime(datetime.datetime.now().timetuple()))

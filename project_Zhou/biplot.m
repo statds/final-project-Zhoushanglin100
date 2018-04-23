@@ -1,1 +1,0 @@
-name = 'Beef';path = '/Users/minda/Dropbox/Uconn/6494 Data Science/project_Zhou/';for i = [1, 7, 13]  ser = load(strcat(path, name, '_bisp/train_ser_', num2str(i)));  saveas(imagesc(ser), strcat(path, name, '_plot/train_bi_ser_', num2str(i)), 'png');end
