@@ -3,7 +3,7 @@
 # sm.c is a constant from Hinich's paper
 
 name <- "Beef"
-path <-"/Users/zhoushanglin/Dropbox/Uconn/6494 Data Science/project_Zhou/"
+path <-"/Users/zhoushanglin/Dropbox/Uconn/6494 Data Science/project_zhou/"
 dyn.load(paste(path, "bispectrum/allfortranmac.so", sep = ''))
 
 bispec <- function(x, sm.c = 0.625){
@@ -39,7 +39,7 @@ sm.c=0.625   # constant from Hinich paper
 m=n^sm.c
 
 for (i in 1:dim(data_trn)[2]){
-  ser = data_trn[, i]
+  ser = diff(data_trn[, i])
   bispects.data_trn <- z <- matrix(0, m, m)
   bispects.data_trn <- bispec(ser,sm.c)$z
   write.table(bispects.data_trn, paste(path, name, "_bisp/train_ser_", i, sep = ''), row.names = FALSE, col.names = FALSE)
@@ -58,7 +58,7 @@ sm.c=0.625   # constant from Hinich paper
 m=n^sm.c
 
 for (i in 1:dim(data_tst)[2]){
-  ser = data_tst[, i]
+  ser = diff(data_tst[, i])
   bispects.data_tst <- z <- matrix(0, m, m)
   bispects.data_tst <- bispec(ser,sm.c)$z
   write.table(bispects.data_tst, paste(path, name, "_bisp/test_ser_", i, sep = ''), row.names = FALSE, col.names = FALSE)
@@ -71,27 +71,27 @@ par(mfrow=c(2,2))
 
 # png(paste(path, name, "_plot/train_ts_ser_1.png", sep = ''))
 pdf(paste(path, name, "_plot/train_ts_ser_1.pdf", sep = ''))
-ts.plot(data_trn[, 1], xlab = "Label 1")
+ts.plot(diff(data_trn[, 1]), xlab = "Label 1")
 dev.off()
 
 # png(paste(path, name, "_plot/train_ts_ser_7.png", sep = ''))
 pdf(paste(path, name, "_plot/train_ts_ser_7.pdf", sep = ''))
-ts.plot(data_trn[, 7], xlab = "label 2")
+ts.plot(diff(data_trn[, 7]), xlab = "label 2")
 dev.off()
 
 # png(paste(path, name, "_plot/train_ts_ser_13.png", sep = ''))
 pdf(paste(path, name, "_plot/train_ts_ser_13.pdf", sep = ''))
-ts.plot(data_trn[, 13], xlab = "label 3")
+ts.plot(diff(data_trn[, 13]), xlab = "label 3")
 dev.off()
 
 # png(paste(path, name, "_plot/train_ts_ser_19.png", sep = ''))
 pdf(paste(path, name, "_plot/train_ts_ser_19.pdf", sep = ''))
-ts.plot(data_trn[, 19], xlab = "label 4")
+ts.plot(diff(data_trn[, 19]), xlab = "label 4")
 dev.off()
 
 # png(paste(path, name, "_plot/train_ts_ser_25.png", sep = ''))
 pdf(paste(path, name, "_plot/train_ts_ser_25.pdf", sep = ''))
-ts.plot(data_trn[, 25], xlab = "label 4")
+ts.plot(diff(data_trn[, 25]), xlab = "label 4")
 dev.off()
 
 par(mfrow=c(1,1))

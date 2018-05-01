@@ -15,7 +15,8 @@ from keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dropout, Dense, A
 ######################### Get Data Directory ########################
 data_path = sys.argv[1]
 bthsize = int(sys.argv[2])
-# Beef --> 3
+# Beef --> 30
+# Earthquakes --> 32
 
 
 doc_name = data_path.split('/')[-2]
